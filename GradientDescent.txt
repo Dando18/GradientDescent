@@ -1,0 +1,68 @@
+stepGradient[func_, start_, \[Lambda]_, steps_, vars_] := 
+  stepGradient[func, start, \[Lambda], steps, vars] = Module[{},
+    vals = {start};
+    grd[f_, v_][n_] := Grad[f, v] /. Thread[v -> n];
+    grad = grd[func, vars];
+    Print[grad[{m, b}]];
+    For[i = 0, i < steps, i++,
+     vals = {vals, (Last@vals) - \[Lambda]*grad[Last@vals]}
+     ];
+    Cases[vals, {__}, {-2}]
+    ];
+
+
+
+f[x_, y_] := Sin[1/2 x^2 - 1/4 y^2 + 3] Cos[2 x + 1 - Exp[y]]
+
+width = 5;
+height = 5;
+
+Manipulate[
+ DynamicModule[{},
+  points2D = 
+   stepGradient[g[x, y], Setting@Dynamic@start, \[Lambda], 
+    numPoints, {x, y}];
+  points3D = (Append[#, g @@ #] &) /@ points2D;
+  p1 = Show[
+    Plot3D[g[x, y], {x, -width/2, width/2}, {y, -height/2, height/2}, 
+     ColorFunction -> "Rainbow"],
+    Graphics3D[{Thickness[0.005], Red, Line[points3D]}],
+    Graphics3D[{PointSize[0.02], Red, Point[points3D]}],
+    ImageSize -> Large
+    ];
+  p2 = LocatorPane[Dynamic@start, 
+    Show[{ContourPlot[
+       g[x, y], {x, -width/2, width/2}, {y, -height/2, height/2}, 
+       ColorFunction -> "Rainbow"], 
+      Graphics[{Thick, Red, Line[points2D]}],
+      Graphics[{PointSize[0.02], Red, Point[points2D]}]}, 
+     ImageSize -> Medium], LocatorAutoCreate -> False, 
+    ContinuousAction -> False];
+  Row[{p1, Dynamic@p2}]
+  ],
+ {{g, f, "Function"}, {f -> "Terrain", (Sin[#1] Cos[#2] &) -> 
+    "Hills", (#1^2 + #2^2 &) -> 
+    "Paraboloid", (error /. m -> #1 /. b -> #2 &) -> "Error"}},
+ {{numPoints, 2, "Number of Iterations"}, 1, 25, 1},
+ {{\[Lambda], 0.2, "Weight"}, 0.01, 1, 0.01},
+ {{start, {-0.34, -2}}, None},
+ ContinuousAction -> False
+ ]
+
+
+
+listSize = 30;
+listMax = 100;
+dist[rho_] := 
+  CopulaDistribution[{"Binormal", rho}, {UniformDistribution[{0, 1}], 
+    UniformDistribution[{0, 1}]}];
+list = listMax*RandomVariate[dist[-.95], listSize];
+
+error = 1/listSize*
+   Sum[(Last@list[[i]] - (m*First@list[[i]] + b))^2, {i, 1, listSize}];
+
+steps = stepGradient[error, {-1, listMax}, 0.05, 10, {m, b}];
+{mf, bf} = Last@steps
+bestFit = Fit[list, {1, x}, x];
+Show[ListPlot[list, AxesLabel -> {"Number of People", "Income"}], 
+ Plot[mf*x + bf, {x, 0, listMax}], Plot[bestFit, {x, 0, listMax}]]
